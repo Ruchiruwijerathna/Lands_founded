@@ -3,75 +3,138 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Free Live Location Map</title>
+    <title>Strategic Land Acquisition Dashboard</title>
     
-    <!-- PapaParse Library to read Google Sheets CSV -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 
-    <!-- Leaflet CSS for Map Styling -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <!-- Leaflet JS for Map Functionality -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <style>
-        body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
-        #map { height: 100vh; width: 100vw; }
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f7f6; }
+        #map { height: 100vh; width: 100vw; z-index: 1; }
         
-        /* Card Styling for the Popup */
-        .map-card { padding: 5px; max-width: 250px; }
-        .map-card h3 { margin: 0 0 8px 0; color: #1a73e8; font-size: 16px; }
-        .map-card p { margin: 0 0 12px 0; font-size: 13px; color: #444; line-height: 1.4; }
-        .map-card a { text-decoration: none; color: white; background: #1a73e8; padding: 6px 12px; border-radius: 4px; font-size: 12px; display: inline-block; }
-        .map-card a:hover { background: #1557b0; }
+        /* 1. Executive Pop-up Card Styling */
+        .leaflet-popup-content-wrapper {
+            border-radius: 8px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            padding: 0;
+            overflow: hidden;
+        }
+        .leaflet-popup-content { margin: 0; width: 280px !important; }
+        
+        .card-header {
+            background: #004b87; /* Corporate Blue */
+            color: white;
+            padding: 12px 15px;
+            font-size: 16px;
+            font-weight: bold;
+            margin: 0;
+        }
+        .card-body { padding: 15px; }
+        .card-body p { margin: 0 0 15px 0; font-size: 14px; color: #333; line-height: 1.5; }
+        
+        .action-btn {
+            display: block;
+            text-align: center;
+            text-decoration: none;
+            color: #004b87;
+            background: #e6f0fa;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: bold;
+            border: 1px solid #cce0f5;
+            transition: all 0.2s ease;
+        }
+        .action-btn:hover { background: #004b87; color: white; }
+
+        /* 2. Radar Pulse Animation for Strategic Locations */
+        .pulse-icon {
+            width: 24px;
+            height: 24px;
+            background: #e74c3c; /* High-alert Red */
+            border-radius: 50%;
+            border: 2px solid white;
+            box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.7);
+            animation: radarPulse 1.5s infinite cubic-bezier(0.66, 0, 0, 1);
+        }
+
+        @keyframes radarPulse {
+            to {
+                box-shadow: 0 0 0 20px rgba(231, 76, 60, 0);
+            }
+        }
     </style>
 </head>
 <body>
 
-    <!-- The map container -->
     <div id="map"></div>
 
     <script>
-        // 1. Define your Google Sheets CSV link here
-        const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQCxk9edXHGuks_P3HqtxddGMRqRfIfeQ60awqLgjmfZhgRR4okFRih2JCYdaR82SW8quFdqLUyeJYO/pub?gid=0&single=true&output=csv';
+        // --- 1. CONFIGURATION ---
+        // Paste your Google Sheet CSV Link here
+        const baseCsvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQCxk9edXHGuks_P3HqtxddGMRqRfIfeQ60awqLgjmfZhgRR4okFRih2JCYdaR82SW8quFdqLUyeJYO/pub?gid=0&single=true&output=csv';
+        
+        // Cache-Buster: Forces the browser to fetch the absolute newest data from your sheet
+        const csvUrl = baseCsvUrl + '&v=' + new Date().getTime();
 
-        // 2. Initialize the Leaflet Map
-        // Set the default center (Colombo, Sri Lanka coordinates: 6.9271, 79.8612) and zoom level
+        // --- 2. MAP INITIALIZATION ---
+        // Centered on Sri Lanka default coordinates
         const map = L.map('map').setView([6.9271, 79.8612], 8);
 
-        // 3. Load the free OpenStreetMap base layer
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        // Premium CartoDB basemap for a cleaner, more corporate look than standard OpenStreetMap
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap &copy; CARTO',
+            maxZoom: 19
         }).addTo(map);
 
-        // 4. Fetch live data from Google Sheets and plot markers
+        // Define the custom pulsating marker
+        const animatedMarker = L.divIcon({
+            className: 'custom-div-icon',
+            html: "<div class='pulse-icon'></div>",
+            iconSize: [24, 24],
+            iconAnchor: [12, 12] // Centers the animation on the exact coordinate
+        });
+
+        // --- 3. DATA PROCESSING ---
         Papa.parse(csvUrl, {
             download: true,
-            header: true, // Uses the first row of the sheet as keys
+            header: true,
+            // Clean the data: trims invisible spaces from your spreadsheet headers
+            transformHeader: function(header) {
+                return header.trim();
+            },
             complete: function(results) {
                 const data = results.data;
                 
                 data.forEach(row => {
-                    // Ensure row has required Latitude and Longitude data
+                    // Check if row has valid coordinates
                     if (row.Latitude && row.Longitude) {
                         const lat = parseFloat(row.Latitude);
                         const lng = parseFloat(row.Longitude);
 
-                        // Create the HTML format for the Popup Card
-                        const cardContent = `
-                            <div class="map-card">
-                                <h3>${row.Name || 'Unknown Location'}</h3>
-                                <p>${row.Description || 'No description provided.'}</p>
-                                ${row.Link ? `<a href="${row.Link}" target="_blank">View Original Link</a>` : ''}
-                            </div>
-                        `;
+                        if (!isNaN(lat) && !isNaN(lng)) {
+                            // Construct the Executive Card UI
+                            const cardContent = `
+                                <div class="card-header">${row.Name || 'Strategic Plot'}</div>
+                                <div class="card-body">
+                                    <p>${row.Description || 'No detailed metrics provided for this parcel.'}</p>
+                                    ${row.Link ? `<a href="${row.Link}" target="_blank" class="action-btn">View Source Details</a>` : ''}
+                                </div>
+                            `;
 
-                        // Add the marker to the map and attach the popup card
-                        L.marker([lat, lng])
-                            .addTo(map)
-                            .bindPopup(cardContent);
+                            // Plot the animated point
+                            L.marker([lat, lng], { icon: animatedMarker })
+                                .addTo(map)
+                                .bindPopup(cardContent);
+                        }
                     }
                 });
+            },
+            error: function(err) {
+                console.error("Data Sync Failed:", err);
+                alert("Failed to load market data. Please check the console.");
             }
         });
     </script>
