@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Strategic Land Acquisition - Satellite Dashboard</title>
+    <title>Advanced Land Valuation Dashboard</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 
@@ -14,154 +14,280 @@
         body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #111; }
         #map { height: 100vh; width: 100vw; z-index: 1; }
         
-        /* Executive Pop-up Card Styling */
-        .leaflet-popup-content-wrapper {
+        /* Executive Control Panel Styling */
+        .control-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
             border-radius: 8px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
-            padding: 0;
-            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            width: 260px;
         }
-        .leaflet-popup-content { margin: 0; width: 280px !important; }
-        
-        .card-header {
+        .control-panel h2 { margin: 0 0 10px 0; font-size: 16px; color: #004b87; font-weight: bold; }
+        .panel-btn {
+            display: width;
+            width: 100%;
             background: #004b87;
             color: white;
-            padding: 12px 15px;
-            font-size: 16px;
+            border: none;
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 4px;
             font-weight: bold;
-            margin: 0;
-        }
-        .card-body { padding: 15px; }
-        .card-body p { margin: 0 0 15px 0; font-size: 14px; color: #333; line-height: 1.5; }
-        
-        .action-btn {
-            display: block;
+            cursor: pointer;
             text-align: center;
-            text-decoration: none;
-            color: #004b87;
+            font-size: 13px;
+            transition: background 0.2s;
+        }
+        .panel-btn:hover { background: #003360; }
+        .panel-btn.active { background: #e74c3c; }
+        
+        .measurement-stats {
+            margin-top: 10px;
+            padding: 10px;
             background: #e6f0fa;
-            padding: 8px 12px;
             border-radius: 4px;
             font-size: 13px;
-            font-weight: bold;
-            border: 1px solid #cce0f5;
-            transition: all 0.2s ease;
+            color: #333;
+            display: none;
+            border-left: 4px solid #004b87;
         }
+        .measurement-stats div { margin-bottom: 4px; }
+
+        /* Executive Pop-up Card Styling */
+        .leaflet-popup-content-wrapper { border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); padding: 0; overflow: hidden; }
+        .leaflet-popup-content { margin: 0; width: 280px !important; }
+        .card-header { background: #004b87; color: white; padding: 12px 15px; font-size: 15px; font-weight: bold; margin: 0; }
+        .card-body { padding: 15px; background: #fff; }
+        .card-body p { margin: 0 0 15px 0; font-size: 13px; color: #333; line-height: 1.5; }
+        .action-btn { display: block; text-align: center; text-decoration: none; color: #004b87; background: #e6f0fa; padding: 8px 12px; border-radius: 4px; font-size: 12px; font-weight: bold; border: 1px solid #cce0f5; }
         .action-btn:hover { background: #004b87; color: white; }
 
-        /* Icon 1: Radar Pulse Animation (Unread/New Location) */
+        /* Icons Styles */
         .pulse-icon {
-            width: 24px;
-            height: 24px;
+            width: 22px;
+            height: 22px;
             background: #e74c3c;
             border-radius: 50%;
             border: 2px solid white;
             box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.7);
             animation: radarPulse 1.5s infinite cubic-bezier(0.66, 0, 0, 1);
         }
+        @keyframes radarPulse { to { box-shadow: 0 0 0 18px rgba(231, 76, 60, 0); } }
 
-        @keyframes radarPulse {
-            to { box-shadow: 0 0 0 20px rgba(231, 76, 60, 0); }
-        }
-
-        /* Icon 2: Static Marker (Read/Viewed Location) */
         .viewed-icon {
-            width: 16px;
-            height: 16px;
-            background: #3498db; /* Subtle Corporate Blue */
+            width: 14px;
+            height: 14px;
+            background: #27ae60; 
             border-radius: 50%;
             border: 2px solid white;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.4);
         }
     </style>
 </head>
 <body>
 
+    <div class="control-panel">
+        <h2>Land Survey Tools</h2>
+        <button id="drawBtn" class="panel-btn" onclick="toggleDrawMode()">Enable Plot Boundary Tool</button>
+        <button id="clearBtn" class="panel-btn" style="background:#7f8c8d;" onclick="clearDrawings()">Clear Measurement Layers</button>
+        
+        <div id="statsPanel" class="measurement-stats">
+            <strong>Calculated Parcel Size:</strong>
+            <div id="statMeters" style="margin-top:5px;"></div>
+            <div id="statFeet"></div>
+            <div id="statPerches"></div>
+        </div>
+    </div>
+
     <div id="map"></div>
 
     <script>
-        // --- 1. CONFIGURATION ---
-        // Paste your Google Sheet CSV Link here
+        // --- 1. DATA CONFIGURATION ---
+        // Your live Google Sheets Database
         const baseCsvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQCxk9edXHGuks_P3HqtxddGMRqRfIfeQ60awqLgjmfZhgRR4okFRih2JCYdaR82SW8quFdqLUyeJYO/pub?gid=0&single=true&output=csv';
-        
-        // Cache-Buster ensures live data
         const csvUrl = baseCsvUrl + '&v=' + new Date().getTime();
 
-        // --- 2. MAP INITIALIZATION ---
-        const map = L.map('map').setView([6.9271, 79.8612], 8);
+        // --- 2. MAP & HYBRID LAYER INITIALIZATION ---
+        const map = L.map('map', { doubleClickZoom: false }).setView([6.9271, 79.8612], 8);
 
-        // High-Resolution Satellite Basemap (Esri World Imagery)
+        // Bedrock Base: Satellite Imagery
         L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-            attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+            maxZoom: 19,
+            attribution: 'Tiles &copy; Esri'
+        }).addTo(map);
+
+        // Overlay 1: Transparent Road Networks
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', {
             maxZoom: 19
         }).addTo(map);
 
-        // Define the two visual states for the markers
-        const unreadAnimatedMarker = L.divIcon({
+        // Overlay 2: City, Town, and Street Labels
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 19
+        }).addTo(map);
+
+        // Define Marker Icons
+        const activePulseIcon = L.divIcon({
             className: 'custom-div-icon',
             html: "<div class='pulse-icon'></div>",
-            iconSize: [24, 24],
-            iconAnchor: [12, 12]
+            iconSize: [22, 22],
+            iconAnchor: [11, 11]
         });
 
-        const readStaticMarker = L.divIcon({
+        const passiveStaticIcon = L.divIcon({
             className: 'custom-div-icon',
             html: "<div class='viewed-icon'></div>",
-            iconSize: [16, 16],
-            iconAnchor: [8, 8]
+            iconSize: [14, 14],
+            iconAnchor: [7, 7]
         });
 
-        // --- 3. DATA PROCESSING ---
+        // --- 3. PIPELINE DATA INTEGRATION ---
         Papa.parse(csvUrl, {
             download: true,
             header: true,
-            // Clean the data: trims invisible spaces and normalizes case
-            transformHeader: function(header) {
-                return header.trim();
-            },
+            transformHeader: function(header) { return header.trim(); },
             complete: function(results) {
-                const data = results.data;
-                
-                data.forEach(row => {
+                results.data.forEach(row => {
                     if (row.Latitude && row.Longitude) {
                         const lat = parseFloat(row.Latitude);
                         const lng = parseFloat(row.Longitude);
 
                         if (!isNaN(lat) && !isNaN(lng)) {
-                            
-                            // Safety fallback for the Description column
-                            // This checks for "Description" or "description"
-                            const parcelDescription = row.Description || row.description || 'No detailed metrics provided for this parcel.';
-                            const parcelName = row.Name || row.name || 'Strategic Plot';
-                            const parcelLink = row.Link || row.link || '';
+                            // Comprehensive case insensitivity fallback
+                            const name = row.Name || row.name || 'Acquisition Target';
+                            const description = row.Description || row.description || row.Details || row.details || 'No active prospectus text provided in data sync.';
+                            const link = row.Link || row.link || '';
 
-                            // Construct the Executive Card UI
                             const cardContent = `
-                                <div class="card-header">${parcelName}</div>
+                                <div class="card-header">${name}</div>
                                 <div class="card-body">
-                                    <p>${parcelDescription}</p>
-                                    ${parcelLink ? `<a href="${parcelLink}" target="_blank" class="action-btn">View Source Details</a>` : ''}
+                                    <p>${description}</p>
+                                    ${link ? `<a href="${link}" target="_blank" class="action-btn">Open Reference Document</a>` : ''}
                                 </div>
                             `;
 
-                            // Plot the point starting with the Unread (Pulse) icon
-                            const marker = L.marker([lat, lng], { icon: unreadAnimatedMarker })
-                                .addTo(map)
-                                .bindPopup(cardContent);
+                            const marker = L.marker([lat, lng], { icon: activePulseIcon }).addTo(map).bindPopup(cardContent);
 
-                            // INTERACTIVE LOGIC: When clicked, change the icon to the static 'Read' state
                             marker.on('click', function() {
-                                this.setIcon(readStaticMarker);
+                                this.setIcon(passiveStaticIcon);
                             });
                         }
                     }
                 });
-            },
-            error: function(err) {
-                console.error("Data Sync Failed:", err);
-                alert("Failed to load market data. Please check the console.");
             }
         });
+
+        // --- 4. ADVANCED PARCEL MEASUREMENT ENGINE ---
+        let isDrawing = false;
+        let drawnPoints = [];
+        let drawPointsGroup = L.layerGroup().addTo(map);
+        let livePolyline = null;
+        let finalPolygon = null;
+
+        function toggleDrawMode() {
+            isDrawing = !isDrawing;
+            const btn = document.getElementById('drawBtn');
+            if (isDrawing) {
+                btn.innerText = "Exit Survey Mode";
+                btn.classList.add('active');
+                map.getContainer().style.cursor = 'crosshair';
+                clearDrawings();
+            } else {
+                finalizePolygon();
+            }
+        }
+
+        map.on('click', function(e) {
+            if (!isDrawing) return;
+
+            drawnPoints.push(e.latlng);
+            
+            L.circleMarker(e.latlng, { radius: 4, color: '#e74c3c', fillColor: '#fff', fillOpacity: 1 }).addTo(drawPointsGroup);
+
+            if (livePolyline) {
+                livePolyline.addLatLng(e.latlng);
+            } else {
+                livePolyline = L.polyline(drawnPoints, { color: '#e74c3c', weight: 3, dashArray: '5, 5' }).addTo(drawPointsGroup);
+            }
+
+            if (drawnPoints.length >= 3) {
+                updateAreaMetrics();
+            }
+        });
+
+        map.on('dblclick', function(e) {
+            if (isDrawing && drawnPoints.length >= 3) {
+                finalizePolygon();
+            }
+        });
+
+        function finalizePolygon() {
+            isDrawing = false;
+            const btn = document.getElementById('drawBtn');
+            btn.innerText = "Enable Plot Boundary Tool";
+            btn.classList.remove('active');
+            map.getContainer().style.cursor = '';
+
+            if (drawnPoints.length < 3) {
+                clearDrawings();
+                return;
+            }
+
+            if (livePolyline) map.removeLayer(livePolyline);
+
+            finalPolygon = L.polygon(drawnPoints, {
+                color: '#004b87',
+                fillColor: '#004b87',
+                fillOpacity: 0.3,
+                weight: 2
+            }).addTo(drawPointsGroup);
+
+            updateAreaMetrics();
+        }
+
+        function updateAreaMetrics() {
+            if (drawnPoints.length < 3) return;
+
+            const refLat = drawnPoints[0].lat;
+            const latFactor = 111132.92; 
+            const lngFactor = 111132.92 * Math.cos(refLat * Math.PI / 180);
+
+            let areaInMeters = 0;
+            const numPoints = drawnPoints.length;
+
+            for (let i = 0; i < numPoints; i++) {
+                const p1 = drawnPoints[i];
+                const p2 = drawnPoints[(i + 1) % numPoints];
+
+                const x1 = p1.lng * lngFactor;
+                const y1 = p1.lat * latFactor;
+                const x2 = p2.lng * lngFactor;
+                const y2 = p2.lat * latFactor;
+
+                areaInMeters += (x1 * y2) - (x2 * y1);
+            }
+
+            const finalAreaSqM = Math.abs(areaInMeters / 2);
+            const finalAreaSqFt = finalAreaSqM * 10.7639;
+            const finalAreaPerches = finalAreaSqM / 25.2929; 
+
+            document.getElementById('statsPanel').style.display = 'block';
+            document.getElementById('statMeters').innerHTML = `<b>Metric:</b> ${finalAreaSqM.toLocaleString(undefined, {maximumFractionDigits: 2})} sq.m`;
+            document.getElementById('statFeet').innerHTML = `<b>Imperial:</b> ${finalAreaSqFt.toLocaleString(undefined, {maximumFractionDigits: 2})} sq.ft`;
+            document.getElementById('statPerches').innerHTML = `<b>Land Size:</b> ${finalAreaPerches.toLocaleString(undefined, {maximumFractionDigits: 2})} Perches`;
+        }
+
+        function clearDrawings() {
+            drawnPoints = [];
+            drawPointsGroup.clearLayers();
+            livePolyline = null;
+            finalPolygon = null;
+            document.getElementById('statsPanel').style.display = 'none';
+        }
     </script>
 
 </body>
