@@ -6,7 +6,6 @@
     <title>Advanced Land Valuation Dashboard</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
@@ -14,78 +13,34 @@
         body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #111; }
         #map { height: 100vh; width: 100vw; z-index: 1; }
         
-        /* Executive Control Panel Styling */
-        .control-panel {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            z-index: 1000;
-            background: rgba(255, 255, 255, 0.95);
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-            width: 260px;
-        }
+        /* Control Panel */
+        .control-panel { position: absolute; top: 20px; right: 20px; z-index: 1000; background: rgba(255, 255, 255, 0.95); padding: 15px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); width: 260px; }
         .control-panel h2 { margin: 0 0 10px 0; font-size: 16px; color: #004b87; font-weight: bold; }
-        .panel-btn {
-            display: width;
-            width: 100%;
-            background: #004b87;
-            color: white;
-            border: none;
-            padding: 10px;
-            margin-bottom: 8px;
-            border-radius: 4px;
-            font-weight: bold;
-            cursor: pointer;
-            text-align: center;
-            font-size: 13px;
-            transition: background 0.2s;
-        }
+        .panel-btn { width: 100%; background: #004b87; color: white; border: none; padding: 10px; margin-bottom: 8px; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 13px; transition: background 0.2s; }
         .panel-btn:hover { background: #003360; }
         .panel-btn.active { background: #e74c3c; }
         
-        .measurement-stats {
-            margin-top: 10px;
-            padding: 10px;
-            background: #e6f0fa;
-            border-radius: 4px;
-            font-size: 13px;
-            color: #333;
-            display: none;
-            border-left: 4px solid #004b87;
-        }
+        .measurement-stats { margin-top: 10px; padding: 10px; background: #e6f0fa; border-radius: 4px; font-size: 13px; color: #333; display: none; border-left: 4px solid #004b87; }
         .measurement-stats div { margin-bottom: 4px; }
 
-        /* Executive Pop-up Card Styling */
-        .leaflet-popup-content-wrapper { border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); padding: 0; overflow: hidden; }
+        /* Executive Pop-up Card with Image Styling */
+        .leaflet-popup-content-wrapper { border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.4); padding: 0; overflow: hidden; }
         .leaflet-popup-content { margin: 0; width: 280px !important; }
+        
         .card-header { background: #004b87; color: white; padding: 12px 15px; font-size: 15px; font-weight: bold; margin: 0; }
+        
+        /* New Image CSS */
+        .card-img { width: 100%; height: 160px; object-fit: cover; display: block; border-bottom: 1px solid #ccc; background: #eee; }
+        
         .card-body { padding: 15px; background: #fff; }
         .card-body p { margin: 0 0 15px 0; font-size: 13px; color: #333; line-height: 1.5; }
         .action-btn { display: block; text-align: center; text-decoration: none; color: #004b87; background: #e6f0fa; padding: 8px 12px; border-radius: 4px; font-size: 12px; font-weight: bold; border: 1px solid #cce0f5; }
         .action-btn:hover { background: #004b87; color: white; }
 
-        /* Icons Styles */
-        .pulse-icon {
-            width: 22px;
-            height: 22px;
-            background: #e74c3c;
-            border-radius: 50%;
-            border: 2px solid white;
-            box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.7);
-            animation: radarPulse 1.5s infinite cubic-bezier(0.66, 0, 0, 1);
-        }
+        /* Icons */
+        .pulse-icon { width: 22px; height: 22px; background: #e74c3c; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.7); animation: radarPulse 1.5s infinite cubic-bezier(0.66, 0, 0, 1); }
         @keyframes radarPulse { to { box-shadow: 0 0 0 18px rgba(231, 76, 60, 0); } }
-
-        .viewed-icon {
-            width: 14px;
-            height: 14px;
-            background: #27ae60; 
-            border-radius: 50%;
-            border: 2px solid white;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.4);
-        }
+        .viewed-icon { width: 14px; height: 14px; background: #27ae60; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.4); }
     </style>
 </head>
 <body>
@@ -106,67 +61,47 @@
     <div id="map"></div>
 
     <script>
-        // --- 1. DATA CONFIGURATION ---
-        // Your live Google Sheets Database
+        // 1. DATA CONFIGURATION
         const baseCsvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQCxk9edXHGuks_P3HqtxddGMRqRfIfeQ60awqLgjmfZhgRR4okFRih2JCYdaR82SW8quFdqLUyeJYO/pub?gid=0&single=true&output=csv';
         const csvUrl = baseCsvUrl + '&v=' + new Date().getTime();
 
-        // --- 2. MAP & HYBRID LAYER INITIALIZATION ---
+        // 2. MAP INITIALIZATION
         const map = L.map('map', { doubleClickZoom: false }).setView([6.9271, 79.8612], 8);
 
-        // Bedrock Base: Satellite Imagery
-        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-            maxZoom: 19,
-            attribution: 'Tiles &copy; Esri'
-        }).addTo(map);
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 }).addTo(map);
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 }).addTo(map);
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 }).addTo(map);
 
-        // Overlay 1: Transparent Road Networks
-        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', {
-            maxZoom: 19
-        }).addTo(map);
+        const activePulseIcon = L.divIcon({ className: 'custom-div-icon', html: "<div class='pulse-icon'></div>", iconSize: [22, 22], iconAnchor: [11, 11] });
+        const passiveStaticIcon = L.divIcon({ className: 'custom-div-icon', html: "<div class='viewed-icon'></div>", iconSize: [14, 14], iconAnchor: [7, 7] });
 
-        // Overlay 2: City, Town, and Street Labels
-        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
-            maxZoom: 19
-        }).addTo(map);
-
-        // Define Marker Icons
-        const activePulseIcon = L.divIcon({
-            className: 'custom-div-icon',
-            html: "<div class='pulse-icon'></div>",
-            iconSize: [22, 22],
-            iconAnchor: [11, 11]
-        });
-
-        const passiveStaticIcon = L.divIcon({
-            className: 'custom-div-icon',
-            html: "<div class='viewed-icon'></div>",
-            iconSize: [14, 14],
-            iconAnchor: [7, 7]
-        });
-
-        // --- 3. PIPELINE DATA INTEGRATION ---
+        // 3. DATA INTEGRATION WITH PHOTOS
         Papa.parse(csvUrl, {
             download: true,
             header: true,
             transformHeader: function(header) { return header.trim(); },
             complete: function(results) {
                 results.data.forEach(row => {
+                    // Pulls automated Lat/Lng from your new sheet setup
                     if (row.Latitude && row.Longitude) {
                         const lat = parseFloat(row.Latitude);
                         const lng = parseFloat(row.Longitude);
 
                         if (!isNaN(lat) && !isNaN(lng)) {
-                            // Comprehensive case insensitivity fallback
-                            const name = row.Name || row.name || 'Acquisition Target';
-                            const description = row.Description || row.description || row.Details || row.details || 'No active prospectus text provided in data sync.';
-                            const link = row.Link || row.link || '';
+                            const name = row.Name || 'Acquisition Target';
+                            const description = row.Description || 'No active prospectus text provided.';
+                            const mapLink = row.MapLink || '';
+                            const photoUrl = row.ImageURL || '';
+
+                            // Only insert the image tag if a photo URL actually exists in the sheet
+                            const imageHTML = photoUrl ? `<img src="${photoUrl}" class="card-img" alt="Site Photo">` : '';
 
                             const cardContent = `
                                 <div class="card-header">${name}</div>
+                                ${imageHTML}
                                 <div class="card-body">
                                     <p>${description}</p>
-                                    ${link ? `<a href="${link}" target="_blank" class="action-btn">Open Reference Document</a>` : ''}
+                                    ${mapLink ? `<a href="${mapLink}" target="_blank" class="action-btn">Open Source Link</a>` : ''}
                                 </div>
                             `;
 
@@ -181,7 +116,7 @@
             }
         });
 
-        // --- 4. ADVANCED PARCEL MEASUREMENT ENGINE ---
+        // 4. PARCEL MEASUREMENT ENGINE (Unchanged)
         let isDrawing = false;
         let drawnPoints = [];
         let drawPointsGroup = L.layerGroup().addTo(map);
@@ -203,26 +138,15 @@
 
         map.on('click', function(e) {
             if (!isDrawing) return;
-
             drawnPoints.push(e.latlng);
-            
             L.circleMarker(e.latlng, { radius: 4, color: '#e74c3c', fillColor: '#fff', fillOpacity: 1 }).addTo(drawPointsGroup);
-
-            if (livePolyline) {
-                livePolyline.addLatLng(e.latlng);
-            } else {
-                livePolyline = L.polyline(drawnPoints, { color: '#e74c3c', weight: 3, dashArray: '5, 5' }).addTo(drawPointsGroup);
-            }
-
-            if (drawnPoints.length >= 3) {
-                updateAreaMetrics();
-            }
+            if (livePolyline) livePolyline.addLatLng(e.latlng);
+            else livePolyline = L.polyline(drawnPoints, { color: '#e74c3c', weight: 3, dashArray: '5, 5' }).addTo(drawPointsGroup);
+            if (drawnPoints.length >= 3) updateAreaMetrics();
         });
 
         map.on('dblclick', function(e) {
-            if (isDrawing && drawnPoints.length >= 3) {
-                finalizePolygon();
-            }
+            if (isDrawing && drawnPoints.length >= 3) finalizePolygon();
         });
 
         function finalizePolygon() {
@@ -231,46 +155,24 @@
             btn.innerText = "Enable Plot Boundary Tool";
             btn.classList.remove('active');
             map.getContainer().style.cursor = '';
-
-            if (drawnPoints.length < 3) {
-                clearDrawings();
-                return;
-            }
-
+            if (drawnPoints.length < 3) { clearDrawings(); return; }
             if (livePolyline) map.removeLayer(livePolyline);
-
-            finalPolygon = L.polygon(drawnPoints, {
-                color: '#004b87',
-                fillColor: '#004b87',
-                fillOpacity: 0.3,
-                weight: 2
-            }).addTo(drawPointsGroup);
-
+            finalPolygon = L.polygon(drawnPoints, { color: '#004b87', fillColor: '#004b87', fillOpacity: 0.3, weight: 2 }).addTo(drawPointsGroup);
             updateAreaMetrics();
         }
 
         function updateAreaMetrics() {
             if (drawnPoints.length < 3) return;
-
             const refLat = drawnPoints[0].lat;
             const latFactor = 111132.92; 
             const lngFactor = 111132.92 * Math.cos(refLat * Math.PI / 180);
-
             let areaInMeters = 0;
             const numPoints = drawnPoints.length;
-
             for (let i = 0; i < numPoints; i++) {
                 const p1 = drawnPoints[i];
                 const p2 = drawnPoints[(i + 1) % numPoints];
-
-                const x1 = p1.lng * lngFactor;
-                const y1 = p1.lat * latFactor;
-                const x2 = p2.lng * lngFactor;
-                const y2 = p2.lat * latFactor;
-
-                areaInMeters += (x1 * y2) - (x2 * y1);
+                areaInMeters += ((p1.lng * lngFactor) * (p2.lat * latFactor)) - ((p2.lng * lngFactor) * (p1.lat * latFactor));
             }
-
             const finalAreaSqM = Math.abs(areaInMeters / 2);
             const finalAreaSqFt = finalAreaSqM * 10.7639;
             const finalAreaPerches = finalAreaSqM / 25.2929; 
@@ -289,6 +191,5 @@
             document.getElementById('statsPanel').style.display = 'none';
         }
     </script>
-
 </body>
 </html>
